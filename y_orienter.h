@@ -43,8 +43,13 @@ struct Orienter{
            //heading error model  mmmm no gauss markov ??
        float m0_norm;
        float head_0;
+
+
        bool isvalid_head;
        bool isvalid_acc;
+
+       bool isupdated_acc;
+       bool isupdated_gyro;
        bool isupdated_marg;
 
 private:
@@ -66,36 +71,31 @@ public:
            float lp_ax,lp_ay,lp_az;
            float lp_mx,lp_my,lp_mz;
 
-           //state
-           VectorXd Xk;//dimX,1 q0 qv bp bq br
-           MatrixXd Pk;//dimX,dimX
-           VectorXd X0;//initial values
-           MatrixXd P0;
-           MatrixXd P0bis;
+           float Xk[4];
+           float Pk[16];
 
            //prediction
            void predict();
-           void setAlpha(double _alpha){alpha=_alpha;}
-           VectorXd Xk_;//dimX,1
-           MatrixXd Pk_;//dimX,dimX
-           MatrixXd Fk;//dimX,dimX
-           MatrixXd Fkt;//dimX,dimX
-           MatrixXd Qk;//dimX,dim
-           MatrixXd Qmap;
-           MatrixXd Qmapt;
-           MatrixXd Qkinit;
-           MatrixXd Omega;//given by quaternion formula
-           double alpha,beta;//gains for tuning
+           float Xk_[4];//dimX,1
+           float Pk_[16];//dimX,dimX
+
+           float Fk[16];//dimX,dimX
+           float Fkt[16];//dimX,dimX
+           float Qk[16];//dimX,dim
+           float Qmap[12];
+           float Qmapt[12];
+           float Qkinit[16];
+           float Omega[16];//given by quaternion formula
 
            //observation update
            void observe();
-           VectorXd Yk;//dimZ,1
-           VectorXd Zk;//dimZ,1
-           VectorXd Zk_;
-           MatrixXd Sk;//
-           MatrixXd Hk;
-           MatrixXd Ro;//dimZ,dimZ
-           MatrixXd Kk;//dimX,dimZ
+           VectorXd Yk[4];//dimZ,1
+           VectorXd Zk[4];//dimZ,1
+           VectorXd Zk_[4];
+           MatrixXd Sk[16];//
+           MatrixXd Hk[16];
+           MatrixXd Ro[16];//dimZ,dimZ
+           MatrixXd Kk[16];//dimX,dimZ
 
            //storage to speed up, never access this
            Vector3d Vv;
@@ -108,25 +108,12 @@ public:
            Matrix3d Rpredict;
            double roll,pitch,heading,norme;
 
-           //displacement
-           Vector3d Xdis;
-           Vector3d Accs;
-
            //output
-           Vector4d ResultQ;
-           Vector3d ResultEuler;
+           float ResultQ[4];
+           float ResultEuler[3];
+           float ResultFix[3];
+           float ResultMatrix[16];
 
-           double res_roll,res_pitch,res_yaw;
-
-           //for distance calc
-           float deltax,deltay,deltaz;
-           float vx_,vy_,vz_;
-           float x,y,z;
-           float sx,sy,sz;//sp = plane sensitivity ie sx and sy
-
-           bool ismoving;
-           bool isaccelerated;
-           double t1,t2;
 
 };
 
