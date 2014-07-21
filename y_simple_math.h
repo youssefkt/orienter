@@ -3,11 +3,11 @@
 
 
 
-extern void matrixMul(float* A, float* B);
+extern void matrixMul(float* A, float* B, float* C, int r, int m, int c);
 
-extern void matrixTrs(float* A, float* B);
+extern void matrixTrs(float* A, float* At, int r, int c);
 
-extern void matrixInv44(float* A, float* B);
+extern bool matrixInv44(const float m[16],  float invOut[16]);
 
 
 
