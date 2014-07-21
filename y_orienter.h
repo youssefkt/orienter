@@ -29,45 +29,29 @@
 
 #include "y_orienter_general.h"
 #include "y_orienter_utils.h"
-#include <GL/glut.h>
-#include <eigen3/Eigen/Dense>
-#include "ros/ros.h"
-#include "../Communication/messages.h"
 
 
-//////defines////////////////////////////////////////////////////
-#define USING_ROS
-
-////////////////////////////////////////////////////////////////
-
-
-
-class Orienter{
+struct Orienter{
 
     public:
 
         bool init();
         void update();
-        void send();
-        void receive();
-
-        Orienter(ros::NodeHandle& _n);
 
     public:
           //*******Error model*******//
            //heading error model  mmmm no gauss markov ??
-       double m0_norm;
-       double head_0;
+       float m0_norm;
+       float head_0;
        bool isvalid_head;
        bool isvalid_acc;
        bool isupdated_marg;
-       double lp_coeff;//coeff = dt/(dt + rc)
-       double lpm_coeff;
+
 private:
            //***********useful functions********//
-       double calculatePitchAcc();
-       double calculateRollAcc();
-       double calculateHeading();
+       float calculatePitchAcc();
+       float calculateRollAcc();
+       float calculateHeading();
        void checkHeading();
        void checkAcc();
 
@@ -76,9 +60,11 @@ public:
            //**********ekf data*************//
 
            //entry
-           double p,q,r,dt,ax,ay,az,mx,my,mz;
-           double lp_ax,lp_ay,lp_az;
-           double lp_mx,lp_my,lp_mz;
+           float p,q,r,dt,ax,ay,az,mx,my,mz;
+           float lp_coeff;//coeff = dt/(dt + rc)
+           float lpm_coeff;
+           float lp_ax,lp_ay,lp_az;
+           float lp_mx,lp_my,lp_mz;
 
            //state
            VectorXd Xk;//dimX,1 q0 qv bp bq br
@@ -133,27 +119,15 @@ public:
            double res_roll,res_pitch,res_yaw;
 
            //for distance calc
-           double deltax,deltay,deltaz;
-           double vx_,vy_,vz_;
-           double x,y,z;
-           double sx,sy,sz;//sp = plane sensitivity ie sx and sy
+           float deltax,deltay,deltaz;
+           float vx_,vy_,vz_;
+           float x,y,z;
+           float sx,sy,sz;//sp = plane sensitivity ie sx and sy
 
            bool ismoving;
            bool isaccelerated;
            double t1,t2;
 
-           //messaging
-           ros::NodeHandle* n;
-           //Message Out
-           ros::Publisher orienter_pub;
-           MESSAGE_ORIENTER message_out_orienter;
-           bool issend_orienter;
-           //Message In
-           ros::Subscriber orienter_sub;
-           static MESSAGE_RAWIMU message_in_imu;
-           static bool isreceived_imu;
-           static double time_receive_imu;  
-           static double prev_time_receive_imu;
 };
 
 
