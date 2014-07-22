@@ -7,15 +7,23 @@
 #include "y_orienter_general.h".h"
 
 
-extern void eulerZYXToFixXYZ(float* euler, float* fix);
+extern void fixToEuler(float* fix, float* euler);
 
-extern void fixXYZToEulerZYX(float* fix, float* euler);
+extern void eulerToFix(float* euler, float* fix);
 
-extern void matrixtoXYZ(float* R, float& roll,float& pitch, float& yaw);
+extern void matrixToFix(float* R, float& roll,float& pitch, float& yaw);
 
-extern void matrixtoQuat(float* R, float* q);
+extern void matrixToQuat(float* R, float* q);
+
+extern void eulerToQuat(float* e, float* q);
+
+extern void fixToQuat(float* f, float* q);
 
 extern void quatToMatrix(float* q, float* R);
+
+extern void eulerToMatrix(float* e, float* R);
+
+extern void fixToMatrix(float* f, float* R);
 
 extern void normalize(float* a, int size);
 

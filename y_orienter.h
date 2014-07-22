@@ -29,104 +29,74 @@
 
 #include "y_orienter_general.h"
 #include "y_orienter_utils.h"
-
+#include "y_simple_math.h"
 
 struct Orienter{
 
     public:
-
-        bool init();
-        void update();
+       bool init();
+       void update();
 
     public:
-          //*******Error model*******//
-           //heading error model  mmmm no gauss markov ??
-       float m0_norm;
-       float head_0;
+
+       bool isinit;
+       bool isupdated;
+
        bool isvalid_head;
        bool isvalid_acc;
-       bool isupdated_marg;
+
+       struct MARG_DATA data;
+       struct MARG_DATA last_data;
+       struct MARG_DATA_0 data_0;
 
 private:
            //***********useful functions********//
-       float calculatePitchAcc();
-       float calculateRollAcc();
-       float calculateHeading();
+       float correctData();
+
+       void calculateRPH();//roll pitch heading
+       void calculateRP();//roll pitch heading
+
        void checkHeading();
        void checkAcc();
 
 public:
 
-           //**********ekf data*************//
+       //state
+       float Xk[4];//dimX,1 q0 qv bp bq br
+       float Pk[16];//dimX,dimX
 
-           //entry
-           float p,q,r,dt,ax,ay,az,mx,my,mz;
-           float lp_coeff;//coeff = dt/(dt + rc)
-           float lpm_coeff;
-           float lp_ax,lp_ay,lp_az;
-           float lp_mx,lp_my,lp_mz;
+       //prediction
+       void predict();
+       float Xk_[4];//dimX,1
+       float Pk_[16];//dimX,dimX
+       float Fk[16];//dimX,dimX
+       float Fkt[16];//dimX,dimX
+       float Q0[16];
+       float Omega[16];//given by quaternion formula
 
-           //state
-           VectorXd Xk;//dimX,1 q0 qv bp bq br
-           MatrixXd Pk;//dimX,dimX
-           VectorXd X0;//initial values
-           MatrixXd P0;
-           MatrixXd P0bis;
+       //observation update
+       void observe();
+       float rph[3];//roll pitch heading provided by sensor
 
-           //prediction
-           void predict();
-           void setAlpha(double _alpha){alpha=_alpha;}
-           VectorXd Xk_;//dimX,1
-           MatrixXd Pk_;//dimX,dimX
-           MatrixXd Fk;//dimX,dimX
-           MatrixXd Fkt;//dimX,dimX
-           MatrixXd Qk;//dimX,dim
-           MatrixXd Qmap;
-           MatrixXd Qmapt;
-           MatrixXd Qkinit;
-           MatrixXd Omega;//given by quaternion formula
-           double alpha,beta;//gains for tuning
+       float Yk[4];//dimZ,1
+       float Zk[4];//dimZ,1
+       float Zk_[4];
+       MatrixXd Sk[16];//
+       MatrixXd Hk[16];
+       MatrixXd R0[16];//dimZ,dimZ
+       MatrixXd Kk[16];//dimX,dimZ
 
-           //observation update
-           void observe();
-           VectorXd Yk;//dimZ,1
-           VectorXd Zk;//dimZ,1
-           VectorXd Zk_;
-           MatrixXd Sk;//
-           MatrixXd Hk;
-           MatrixXd Ro;//dimZ,dimZ
-           MatrixXd Kk;//dimX,dimZ
+       //dumb storage
+       float R[9];
+       float Vr[3];
+       float norme;
 
-           //storage to speed up, never access this
-           Vector3d Vv;
-           Vector3d Vrotated;
-           Matrix3d Rx;
-           Matrix3d Ry;
-           Matrix3d Rz;
-           Matrix3d R;
-           MatrixXd ObsS;
-           Matrix3d Rpredict;
-           double roll,pitch,heading,norme;
+       //output
+       float ResultQ[3];
+       float ResultEuler[3];
+       float ResultFix[3];
+       float ResultMatrix[9];
 
-           //displacement
-           Vector3d Xdis;
-           Vector3d Accs;
-
-           //output
-           Vector4d ResultQ;
-           Vector3d ResultEuler;
-
-           double res_roll,res_pitch,res_yaw;
-
-           //for distance calc
-           float deltax,deltay,deltaz;
-           float vx_,vy_,vz_;
-           float x,y,z;
-           float sx,sy,sz;//sp = plane sensitivity ie sx and sy
-
-           bool ismoving;
-           bool isaccelerated;
-           double t1,t2;
 
 };
 

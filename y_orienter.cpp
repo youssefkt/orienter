@@ -1,167 +1,97 @@
 #include "y_orienter.h"
 
-double Orienter::time_receive_imu = 0;
-double Orienter::prev_time_receive_imu = 0;
-MESSAGE_RAWIMU Orienter::message_in_imu;
-bool Orienter::isreceived_imu;
+Orienter::Orienter(){
 
-void msgHandlerImu(const MESSAGE_RAWIMU& msg){
-
-    Orienter::isreceived_imu = true;
-    Orienter::message_in_imu.a[0] = msg.a[0];
-    Orienter::message_in_imu.a[1] = msg.a[1];
-    Orienter::message_in_imu.a[2] = msg.a[2];
-    Orienter::message_in_imu.g[0] = msg.g[0];
-    Orienter::message_in_imu.g[1] = msg.g[1];
-    Orienter::message_in_imu.g[2] = msg.g[2];
-    Orienter::message_in_imu.m[0] = msg.m[0];
-    Orienter::message_in_imu.m[1] = msg.m[1];
-    Orienter::message_in_imu.m[2] = msg.m[2];
-}
-
-
-Orienter::Orienter(ros::NodeHandle& _n):n(&_n),Xk(4),Pk(4,4),X0(4),P0(4,4),P0bis(4,4),Xk_(4),Pk_(4,4),Fk(4,4),Fkt(4,4),Qk(4,4),Qmap(4,3),Qmapt(3,4),Qkinit(4,4),alpha(1.0),beta(1.0),Omega(4,4),Yk(4),Zk(4),Zk_(4),Sk(4,4),Hk(4,4),Ro(4,4),
-    Kk(4,4),ObsS(4,4),roll(0),pitch(0),heading(0),norme(0),deltax(0),deltay(0),deltaz(0),vx_(0),vy_(0),vz_(0),x(0),y(0),z(0),ismoving(false),isaccelerated(false){
-
-    //acc_count[0]=0.0;acc_count[1]=0.0;acc_count[2]=0.0;
-
-    orienter_pub = n->advertise<MESSAGE_ORIENTER>(MESSAGE_NAME_ORIENTER, 3);
-    orienter_sub = n->subscribe(MESSAGE_NAME_RAWIMU, 3, msgHandlerImu);
-
-    isreceived_imu = false;
-    issend_orienter = false;
-
-    x = 0; y = 0; z = 0;
-    res_roll = 0.; res_pitch = 0.;res_yaw = 0.;
-    isupdated_marg = false;
-
-
-    double tau = YP_filter_tau;//we want 100 ms smoothing
-    lp_coeff = 1.0/(1.0 + YP_lp_freq_*tau);
-    lpm_coeff = 1.0/(1.0 + YP_lp_freq_*3*tau);
-
-}
-
-//Orienter::Orienter():Xk(4),Pk(4,4),X0(4),P0(4,4),P0bis(4,4),Xk_(4),Pk_(4,4),Fk(4,4),Fkt(4,4),Qk(4,4),Qmap(4,3),Qmapt(3,4),Qkinit(4,4),alpha(1.0),beta(1.0),Omega(4,4),Yk(4),Zk(4),Zk_(4),Sk(4,4),Hk(4,4),Ro(4,4),
-//    Kk(4,4),ObsS(4,4),roll(0),pitch(0),heading(0),norme(0),deltax(0),deltay(0),deltaz(0),vx_(0),vy_(0),vz_(0),x(0),y(0),z(0),ismoving(false),isaccelerated(false){
-//    acc_count[0]=0.0;acc_count[1]=0.0;acc_count[2]=0.0;
-//}
-
-void Orienter::send(){
-    if(issend_orienter){
-        message_out_orienter.timestamp = time_receive_imu;
-        orienter_pub.publish(message_out_orienter);
-        issend_orienter = false;
-    }
-}
-
-void Orienter::receive(){
-    ros::spinOnce();
-    if(isreceived_imu){
-
-        prev_time_receive_imu = time_receive_imu;
-        time_receive_imu = YF_get_time();
-        ax = message_in_imu.a[0];ay = message_in_imu.a[1];az = message_in_imu.a[2];
-        p = message_in_imu.g[0]*Y_TO_RAD;q = message_in_imu.g[1]*Y_TO_RAD;r = message_in_imu.g[2]*Y_TO_RAD;
-        mx = message_in_imu.m[0];my = message_in_imu.m[1];mz = message_in_imu.m[2];
-        //isreceived_imu = false;
-    }
+    isinit = false;
+    isupdated = false;
 
 }
 
 bool Orienter::init(){
 
+    if(isupdated && !isinit){
 
-    cerr<<"Imu Initializing, please don't move !"<<endl;
+        isupdated = false;
 
-    isvalid_head = false;
-    int mcount = 5;
-    int total = 5;
-    m0_norm = 0.;
-    double m0[3];
-    m0[0] = 0.; m0[1] = 0.; m0[2] = 0.;
-    double head_0bis = 0.;
+        if(!data_0.mags_nbr && !data_0.gyros_nbr && !data_0.accs_nbr){
 
-    fprintf(stderr, "INFO IMU :: Waiting for mag calib...\n");
-    while(mcount>0&& ros::ok()){
-        receive();
-        if(isreceived_imu){
-            m0[0]+=mx;
-            m0[1]+=my;
-            m0[2]+=mz;
-            head_0bis+=calculateHeading();
-            --mcount;
-            isreceived_imu = false;
+            isinit = true;
+            float acc_div =  1.0/((YP_nbr_accs>0)?YP_nbr_accs:1);
+            float gyro_div =  1.0/((YP_nbr_gyros>0)?YP_nbr_gyros:1);
+            float mag_div =  1.0/((YP_nbr_mags>0)?YP_nbr_mags:1);
+
+            int i;
+            for(i = 0; i<3;++i){
+                data_0.accs_0[i]*=acc_div;
+                data_0.gyros_0[i]*=gyro_div;
+                data_0.mags_0[i]*=mag_div;
+            }
+
+            data_0.accs_n = sqrt(data_0.accs_0[0]*data_0.accs_0[0]+data_0.accs_0[1]*data_0.accs_0[1]+data_0.accs_0[2]*data_0.accs_0[2]);
+            data_0.gyros_n = sqrt(data_0.gyros_0[0]*data_0.gyros_0[0]+data_0.gyros_0[1]*data_0.gyros_0[1]+data_0.gyros_0[2]*data_0.gyros_0[2]);
+            data_0.mags_n = sqrt(data_0.mags_0[0]*data_0.mags_0[0]+data_0.mags_0[1]*data_0.mags_0[1]+data_0.mags_0[2]*data_0.mags_0[2]);
+
+            for(i = 0; i<3; ++i){
+                data.accs[i] = data_0.accs_xyz[i]*(data_0.accs_s[i]*data.accs[i]);
+                data.gyros[i] = data_0.accs_xyz[i]*(data_0.gyros_s[i]*data.gyros[i] - data_0.gyros_0[i]);
+                data.mags[i] = data_0.accs_xyz[i]*(data_0.mags_s[i]*data.mags[i]);
+            }
+
+            for(i =0 ;i<3; ++i){
+                last_data.accs[i] = data.accs[i];
+                last_data.gyros[i] = data.gyros[i];
+                last_data.mags[i] = data.mags[i];
+            }
+
+            calculateRPH();
+
+            for(i = 0; i<3;++i){
+                data_0.rph_0[i] = rph[i];
+            }
+
+            //make X0 Pk0
+            fixToQuat(rph,Xk);
+
+            Pk[0] = 0.015; Pk[1] =  0.0; Pk[2] = 0.0; Pk[3] = 0.0;
+            Pk[4] = 0.0; Pk[5] = 0.015; Pk[6] = 0.0; Pk[7] = 0.0;
+            Pk[8] = 0.0; Pk[9] = 0.0; Pk[10] = 0.015; Pk[11] = 0.0;
+            Pk[12] = 0.0; Pk[13] = 0.0; Pk[14] = 0.0; Pk[15] = 0.015;
+
+            R0[0] = 0.015; R0[1] =  0.0; R0[2] = 0.0; R0[3] = 0.0;
+            R0[4] = 0.0; R0[5] = 0.015; R0[6] = 0.0; R0[7] = 0.0;
+            R0[8] = 0.0; R0[9] = 0.0; R0[10] = 0.015; R0[11] = 0.0;
+            R0[12] = 0.0; R0[13] = 0.0; R0[14] = 0.0; R0[15] = 0.02;
+
+            Q0[0] = 0.03; Q0[1] =  -0.01; Q0[2] = -0.01; Q0[3] = -0.01;
+            Q0[4] = -0.01; Q0[5] = 0.03; Q0[6] = -0.01; Q0[7] = -0.01;
+            Q0[8] = -0.01; Q0[9] = -0.01; Q0[10] = 0.03; Q0[11] = -0.01;
+            Q0[12] = -0.01; Q0[13] = -0.01; Q0[14] = -0.01; Q0[15] = 0.03;
+
+        }else{
+            if(data.isupdated_accs && data_0.accs_nbr>0){
+                for(i = 0; i<3;++i){
+                    data_0.accs_0[i] += data.accs[i];
+                }
+                --data_0.accs_nbr;
+            }
+            if(data.isupdated_gyros && data_0.gyros_nbr>0){
+                for(i = 0; i<3;++i){
+                    data_0.gyros_0[i] += data.gyros[i];
+                }
+                --data_0.gyros_nbr;
+            }
+            if(data.isupdated_mags && data_0.mags_nbr>0){
+                for(i = 0; i<3;++i){
+                    data_0.mags_0[i] += data.mags[i];
+                }
+                --data_0.mags_nbr;
+            }
         }
-        usleep(300000);
-    }
-    m0[0]/=total;m0[1]/=total;m0[2]/=total;
-    m0_norm = sqrt(m0[0]*m0[0]+m0[1]*m0[1]+m0[2]*m0[2]);
-    head_0 = head_0bis/total;
-
-    isreceived_imu = false;
-
-    time_receive_imu = YF_get_time();
-
-    while(ros::ok()){
-        receive();
-        if(isreceived_imu){
-            break;
-        }
-        usleep(300000);
     }
 
-
-    //receive();
-
-    calculateHeading();
-
-    Vv<<roll,pitch,heading;
-    Vector4d Xbis;
-    //make X0
-    RPYToQuat2(Vv,Xbis,Rx,Ry,Rz,R,norme);
-    X0(0)=Xbis(0);X0(1)=Xbis(1);X0(2)=Xbis(2);X0(3)=Xbis(3);
-    //make Q q' = f(q,gyros)=> mapping of covariance matrix with d(f)/d(gyros)
-    Matrix3d Qinit;
-    //Qinit<<p_bw,0.0,0.0,0.0,q_bw,0.0,0.0,0.0,r_bw;
-    Qinit<<0.0001,0.0,0.0,0.0,0.0001,0.0,0.0,0.0,0.0001;
-
-    Qmap<<-1,-1,-1,1,-1,1,1,1,-1,-1,1,1;
-    Qmap*=0.5;
-    Qmapt = Qmap.transpose();
-
-    Qkinit = Qmap*Qinit*Qmapt;//*Qmap;
-    //cerr<<"Q is "<<Qk<<endl;
-
-    //make P0 //some degrees of error
-    P0<<0.0015,0.0,0.0,0.0,0.0,0.0015,0.0,0.0,0.0,0.0,0.0015,0.0,0.0,0.0,0.0,0.0015;
-    //P0bis<<0.01,0.001,0.001,0.001,0.001,0.01,0.001,0.001,0.001,0.001,0.01,0.001,0.001,0.001,0.001,0.01;
-
-    Xk(0) = X0(0);
-    Xk(1) = X0(1);
-    Xk(2) = X0(2);
-    Xk(3) = X0(3);
-    Pk=P0;
-    //error model
-    //Ro<<ax_bw,0.0,0.0,0.0,0.0,ay_bw,0.0,0.0,0.0,0.0,az_bw,0.0,0.0,0.0,0.0,head_bw;
-    Ro<<0.001,0.0,0.0,0.0,0.0,0.001,0.0,0.0,0.0,0.0,0.001,0.0,0.0,0.0,0.0,0.001;
-
-
-
-    lp_ax = ax;
-    lp_ay = ay;
-    lp_az = az;
-    lp_mx = mx;
-    lp_my = my;
-    lp_mz = mz;
-
-    cerr<<"Imu Done Init."<<endl;
-
-    return true;
 }
 
 void Orienter::update(){
-
 
     issend_orienter=false;
     bool fuse = true;
@@ -463,48 +393,68 @@ void Orienter::observe(){
 
 }
 
-double Orienter::calculateRollAcc(){
+void Orienter::correctData(){
 
-    roll = atan2(ay,az);
-    if(roll>Y_PI)roll-=Y_2PI;
-    if(roll<-Y_PI)roll+=Y_2PI;
-    return roll;
+    int i=0;
+    for(i = 0; i<3; ++i){
+        data.accs[i] = data_0.accs_xyz[i]*(data_0.accs_s[i]*data.accs[i]);
+        data.accs[i] = data_0.accs_lp * data.accs[i] + data_0.accs_lp_ * last_data.accs[i];
+
+        data.gyros[i] = data_0.gyros_xyz[i]*(data_0.gyros_s[i]*data.gyros[i] - data_0.gyros_0[i]);
+        data.gyros[i] = data_0.gyros_lp * data.gyros[i] + data_0.gyros_lp_ * last_data.gyros[i];
+
+        data.mags[i] = data_0.mags_xyz[i]*(data_0.mags_s[i]*data.mags[i]);
+        data.mags[i] = data_0.mags_lp * data.mags[i] + data_0.mags_lp_ * last_data.mags[i];
+    }
 
 }
 
-double Orienter::calculatePitchAcc(){
+void Orienter::calculateRPH(){
 
-    pitch = atan2(-ax,sqrt(ay*ay+az*az));
-    if(pitch>Y_PI)pitch-=Y_2PI;
-    if(pitch<-Y_PI)pitch+=Y_2PI;
-    return pitch;
+    calculateRP();
+
+    fixToMatrix(rph,R);
+
+    matrixMul(R,data.mags,Vr,3,3,1);
+
+    rph[2] = -atan2(Vr[1],Vr[0])-data_0.rph_0[2];
+    if(rph[2]>Y_PI)rph[2]-=Y_2PI;
+    if(rph[2]<-Y_PI)rph[2]+=Y_2PI;
+    return rph[2];
+
 }
 
-double Orienter::calculateHeading(){
-    roll = calculateRollAcc();
-    pitch = calculatePitchAcc();
-    //transform to horizontal
-    Vv<<mx,my,mz;
-    rotateEulerZYX(0.0,pitch,roll,Vv,Vrotated,Rx,Ry,Rz);
+void calculateRP(){
 
-    heading = -atan2(Vrotated(1),Vrotated(0))-head_0;
-    if(heading>Y_PI)heading-=Y_2PI;
-    if(heading<-Y_PI)heading+=Y_2PI;
-    return heading;
+    rph[0] = atan2(data.accs[1],data.accs[2]);
+    if(rph[0]>Y_PI)rph[0]-=Y_2PI;
+    if(rph[0]<-Y_PI)rph[0]+=Y_2PI;
+
+    rph[1] = atan2(-data.accs[0],sqrt(data.accs[1]*data.accs[1]+data.accs[2]*data.accs[2]));
+    if(rph[1]>Y_PI)rph[1]-=Y_2PI;
+    if(rph[1]<-Y_PI)rph[1]+=Y_2PI;
+
+    rph[2] = 0;
+
 }
+
 
 void Orienter::checkHeading(){
-    norme = sqrt(mx*mx+my*my+mz*mz);
-    if(norme > YP_Head_validity*m0_norm || norme < m0_norm/YP_Head_validity){isvalid_head = false; heading=-1000;}
-    else isvalid_head = true;
+
+    isvalid_head = true;
+    norme = sqrt(data.mags[0]*data.mags[0]+data.mags[1]*data.mags[1]+data.mags[2]*data.mags[2]);
+    if(norme > YP_Head_validity*data_0.mags_n || norme < YP_Head_validity_1*data_0.mags_n ){
+        isvalid_head = false;
+    }
+
 }
 
 void Orienter::checkAcc(){
 
-    norme = sqrt(ax*ax+ay*ay+az*az);
-    if(norme > YP_Acc_validity*Yfix_GravField || norme < Yfix_GravField/YP_Acc_validity){isaccelerated=true;isvalid_acc = false; roll=-1000;pitch=-1000;}
-    else {
-        isvalid_acc = true;
-        isaccelerated = false;
+    isvalid_acc = true;
+    norme = sqrt(data.accs[0]*data.accs[0]+data.accs[1]*data.accs[1]+data.accs[2]*data.accs[2]);
+    if(norme > YP_Acc_validity*data_0.accs_n || norme < YP_Acc_validity_1*data_0.accs_n ){
+        isvalid_acc = false;
     }
+
 }

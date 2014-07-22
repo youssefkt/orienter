@@ -19,36 +19,99 @@ const float Yfix_GravField = 1.0;
 
 //validity check
 const float YP_Head_validity = 1.15;// if the norme is bigger than the mqgnfield intensity * validity then heading non valid
+const float YP_Head_validity_1 = 1.0/YP_Head_validity;
 const float YP_Acc_validity = 1.05;
+const float YP_Acc_validity_1 = 1.0/YP_Acc_validity;
 
-struct MARG_RAW_MESSAGE{
+//nbr of samples
+const int YP_nbr_mags = 30;
+const int YP_nbr_accs = 100;
+const int YP_nbr_gyros = 100;
 
-    MARG_RAW_MESSAGE(float ax, float ay, float az,
-                               float gx, float gy,float gz,
-                               float mx, float my,float mz,
-                               float _dt){
-        dt = _dt;
-        accsx = ax;//body coordinate system x front and z up
-        accsy = ay;
-        accsz = az;
-        gyrosx = gx;//
-        gyrosy = gy;
-        gyrosz = gz;
-        magsx = mx;//body earth coordinate system x front and z down
-        magsy = my;
-        magsz = mz;
+struct MARG_DATA{
+
+    float accs[3];
+    float gyros[3];
+    float mags[3];
+    uint64_t dt;
+    uint8_t flag;
+    bool isupdated_gyros;
+    bool isupdated_accs;
+    bool isupdated_mags;
+
+    MARG_DATA(){
+        isupdated_gyros = false;
+        isupdated_accs = false;
+        isupdated_mags = false;
+        flag = 0;
     }
 
-    float dt;
-    float accsx;
-    float accsy;
-    float accsz;
-    float gyrosx;
-    float gyrosy;
-    float gyrosz;
-    float magsx;
-    float magsy;
-    float magsz;
+};
+
+struct MARG_DATA_0{
+
+    MARG_DATA_0()
+    {
+        accs_s[0] = 1;accs_s[1] = 1;accs_s[2] = 1;
+        gyros_s[0] = 1;gyros_s[1] = 1;gyros_s[2] = 1;
+        mags_s[0] = 1;mags_s[1] = 1;mags_s[2] = 1;
+
+        accs_0[0] = 0;accs_0[1] = 0;accs_0[2] = 0;
+        gyros_0[0] = 0;gyros_0[1] = 0;gyros_0[2] = 0;
+        mags_0[0] = 0;mags_0[1] = 0;mags_0[2] = 0;
+
+        accs_n = 1;
+        gyros_n = 1;
+        mags_n = 1;
+
+        accs_xyz[0] = 1;accs_xyz[1] = 1;accs_xyz[2] = 1;
+        gyros_xyz[0] = 1;gyros_xyz[1] = 1;gyros_xyz[2] = 1;
+        mags_xyz[0] = 1;mags_xyz[1] = 1;mags_xyz[2] = 1;
+
+        accs_lp = 1.0/(1.0 + YP_lp_freq_*YP_filter_tau);
+        gyros_lp = 1.0/(1.0 + YP_lp_freq_*YP_filter_tau*0.5);
+        mags_lp = 1.0/(1.0 + YP_lp_freq_*3*YP_filter_tau);
+
+        accs_lp_ = 1.0 - accs_lp;
+        gyros_lp_ = 1.0 - gyros_lp;
+        mags_lp_ = 1.0 - mags_lp;
+
+        accs_nbr = YP_nbr_accs;
+        gyros_nbr = YP_nbr_gyros;
+        mags_nbr = YP_nbr_mags;
+
+    }
+
+    float accs_s[3];
+    float gyros_s[3];
+    float mags_s[3];
+
+    float accs_0[3];
+    float gyros_0[3];
+    float mags_0[3];
+
+    float accs_n;
+    float gyros_n;
+    float mags_n;
+
+    float accs_xyz[3];
+    float gyros_xyz[3];
+    float mags_xyz[3];
+
+    float accs_lp;
+    float gyros_lp;
+    float mags_lp;
+
+    float accs_lp_;
+    float gyros_lp_;
+    float mags_lp_;
+
+    int accs_nbr;
+    int gyros_nbr;
+    int mags_nbr;
+
+    float rph_0[3];
+
 };
 
 
